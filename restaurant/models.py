@@ -4,17 +4,27 @@ from django.forms import ValidationError
 
 
 class Article(models.Model):
-    titel = models.CharField(max_length=100, db_index=True)
-    preview_image = models.ImageField(null=True, blank=True)
+    title = models.CharField(max_length=100, db_index=True)  # 검색 속도 향상
+    preview_image = models.ImageField(upload_to="article", null=True, blank=True)
+    # 업로드된 이미지는 /media/article/ 폴더 안에 저장됨.
+
     content = models.TextField()
-    show_at_index = models.BooleanField(default=False)  # 기본값은 표시안함
-    is_published = models.BooleanField(default=False)  # 칼럼을 사용자에게 노출할지 여부
-    created_at = models.DateTimeField("생성일", auto_now_add=True)
-    modified_at = models.DateTimeField("수정일", auto_now=True)
+    show_at_index = models.BooleanField(
+        default=False
+    )  # 기본값은 False (즉, 체크 안 된 상태로 저장됨).
+    is_published = models.BooleanField(
+        default=False
+    )  # 기본값은 False (즉, 체크 안 된 상태로 저장됨).
+    created_at = models.DateTimeField(
+        "생성일", auto_now_add=True
+    )  # 객체가 처음 생성될 때만 현재 시각으로 자동 저장.
+    modified_at = models.DateTimeField(
+        auto_now=True
+    )  # 객체가 수정될 때마다 자동으로 시간 업데이트됨.
 
     class Meta:
         verbose_name = "칼럼"
-        verbose_name_plural = "칼럼s"
+        verbose_name_plural = "칼럼"  # 푸얼러
 
     def __str__(self):
         return f"{self.id} - {self.title}"
@@ -27,14 +37,14 @@ class Restaurant(models.Model):
     )
     description = models.TextField("설명", null=True, blank=True)
     address = models.CharField("주소", max_length=255, db_index=True)
-    feature = models.CharField("특징", max_length=255, null=True, blank=True)
-    is_closed = models.BooleanField("폐업여부", default=False)
-    latitude = models.DecimalField(
+    feature = models.CharField("특징", max_length=255)
+    is_closed = models.BooleanField("폐업 여부", default=False)
+    latitude = models.DecimalField(  # 고정 소수점 숫자를 저장하는 필드. 위도/경도와 같은 정밀한 실수 표현에 적합.
         "위도",
-        max_digits=16,  # 소수점포함 숫자자릿점 38.01215654
-        decimal_places=12,  # 소수점 이하 자릿수 정수부: 소수부
-        db_index=True,
-        default="0.0000",
+        max_digits=16,  # 전체 숫자 자릿수 (소수점 포함 총 16자리까지 허용).
+        decimal_places=12,  # 소수점 이하 자릿수 (정수부는 4자리, 소수부는 12자리 허용).
+        db_index=True,  # 검색 최적화를 위해 인덱스 생성.
+        default="0.0000",  # 기본값 설정. 문자열로 설정되어 있지만 숫자로 변환되어 저장됨.
     )
     longitude = models.DecimalField(
         "경도",
@@ -44,60 +54,59 @@ class Restaurant(models.Model):
         default="0.0000",
     )
     phone = models.CharField(
-        "전화번호", max_length=16, help_text="E.164 포멧"  # 예: +821012345678
+        "전화번호", max_length=16, help_text="E.164 포맷", blank=True, null=True
     )
     rating = models.DecimalField(
-        "평점",
-        max_digits=3,
-        decimal_places=2,  # 최대 9.99 최대 소수점 둘째 자리까지 표현됨
-        default=0.0,
-    )
+        "평점", max_digits=3, decimal_places=2, default="0.0"
+    )  # 예: 9.99까지 가능 (최대 소수점 둘째 자리까지 표현됨).
     rating_count = models.PositiveIntegerField(
-        "평가수",
-        default=0,
-    )  # 좋아요 갯수
-    # 영업 시작시간
-    start_time = models.TimeField("영업 시작 시간", null=True, blank=True)
+        "평가수", default=0
+    )  # 0 이상의 양의 정수만 허용하는 필드 (예:좋아요 수, 평가 수 등).
+    start_time = models.TimeField(
+        "영업 시작 시간", null=True, blank=True
+    )  # 시/분/초 단위의 시간만 저장하는 필드 (날짜는 없음). 예: 18:30:00
     end_time = models.TimeField("영업 종료 시간", null=True, blank=True)
     last_order_time = models.TimeField("라스트 오더 시간", null=True, blank=True)
     category = models.ForeignKey(
         "RestaurantCategory",
-        on_delete=models.SET_NULL,  # 참조된 카테고리 삭제시 null로 설정되며 (데이터 보존)
+        on_delete=models.SET_NULL,
         blank=True,
-        null=True,
+        null=True,  # 참조된 카테고리 삭제 시, 이 필드 값을 NULL로 설정 (데이터 보존).
     )
     tags = models.ManyToManyField(
-        "Tag",
-        blank=True,
-    )  # M:N 관계
+        "Tag", blank=True
+    )  # 다대다(M:N) 관계 설정. 하나의 레스토랑이 여러 태그를 가질 수 있음.
     region = models.ForeignKey(
-        "restaurant.Region",
-        on_delete=models.SET_NULL,  # 참조된 지역 삭제시 null로 설정되며
+        "Region",
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        db_index=True,
-        verbose_name="지역",
-        related_name="restaurants",  # 역참조 이름 설정
+        verbose_name="지역",  # 관리자 페이지 필드명 한국어로 표시됨.
+        related_name="restaurants",  # 역참조 시 사용. 예: region.restaurants.all()로 해당 지역의 모든 레스토랑 조회 가능.
+        # Restaurant → Region
+        # → 레스토랑은 "한" 지역에 속합니다 (지역을 참조합니다).
+        # Region ← Restaurant
+        # → 하나의 지역은 여러 개의 레스토랑이 있을 수 있습니다.
+        # → 이때 지역에서 연결된 레스토랑들을 찾아오는 방법이 바로 .restaurants 입니다.
+        # restaurant.region 정방향 참조: 레스토랑이 어느지역에 속하는지 확인
+        # region.restaurants.all() 역참조: 이 지역에 속한 모든 레스토랑들을 조회
     )
-    # 레스토랑 지역 region.restaurants.all()
 
     class Meta:
         verbose_name = "레스토랑"
-        verbose_name_plural = "레스토랑s"
+        verbose_name_plural = "레스토랑"
 
     def __str__(self):
         return f"{self.name} {self.branch_name}" if self.branch_name else self.name
-
-    # 지점명 있으면 이름 지점명을 반환해주고, 없으면 식당이름만 반환해주고
-    # 본스테이크 강남점, 본스테이크
+        # 지점명이 있으면 "이름 지점명", 없으면 "이름"만 반환 → 관리자 페이지에서 식별 용이.
 
 
-class CuisineType(models.Model):
+class CuisineType(models.Model):  # 퀴진
     name = models.CharField("이름", max_length=20)
 
     class Meta:
-        verbose_name = "음식종류"
-        verbose_name_plural = "음식종류s"
+        verbose_name = "음식 종류"
+        verbose_name_plural = "음식 종류"
 
     def __str__(self):
         return self.name
@@ -105,16 +114,16 @@ class CuisineType(models.Model):
 
 class RestaurantCategory(models.Model):
     name = models.CharField("이름", max_length=20)
-    cuisineType = models.ForeignKey(
+    cuisine_type = models.ForeignKey(
         "CuisineType",
-        on_delete=models.CASCADE,  # 음식종류 삭제시 카테고리도 삭제
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
 
     class Meta:
-        verbose_name = "레스토랑 카테고리"
-        verbose_name_plural = "레스토랑 카테고리s"
+        verbose_name = "가게 카테고리"
+        verbose_name_plural = "가게 카테고리"
 
     def __str__(self):
         return self.name
@@ -124,30 +133,39 @@ class RestaurantImage(models.Model):
     restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE)
     is_representative = models.BooleanField(
         "대표 이미지 여부", default=False
-    )  # 이미지를 업데이트 했는데 체크하면 대표이미지로 변경
+    )  # 체크하면 대표이미지로 설정됨, 기본값은 대표이미지 가 체크되지 않아서 이미지 저장후 체크여부 선택
     order = models.PositiveIntegerField("순서", null=True, blank=True)
     name = models.CharField("이름", max_length=100, null=True, blank=True)
-    image = models.ImageField("이미지", max_length=100, upload_to="restaurant")
-    # 사용자가 이미즐 업로드하면 MEDIA_ROOT/restaurant/폴더 아래 이미지 파일이 저장됐다.
-    created_at = models.DateTimeField("생성일", auto_now_add=True, db_index=True)
-    updated_at = models.DateTimeField("수정일", auto_now_add=True, db_index=True)
+    image = models.ImageField(
+        "이미지", max_length=100, upload_to="restaurant"
+    )  # 사용자가 이미지를 업로드하면 MEDIA_ROOT/restaurant/ 폴더 아래에 이미지 파일이 저장됩니다. MEDIA_ROOT가 /media/라고 가정하면
+    created_at = models.DateTimeField(
+        "생성일", auto_now_add=True, db_index=True
+    )  # 데이터를 등록하면 생성일은 자동으로 생성됨
+    updated_at = models.DateTimeField("수정일", auto_now=True, db_index=True)
 
     class Meta:
-        verbose_name = "레스토랑 카테고리"
-        verbose_name_plural = "레스토랑 카테고리s"
+        verbose_name = "가게 이미지"
+        verbose_name_plural = "가게 이미지"
 
     def __str__(self):
         return f"{self.id}:{self.image}"
 
-    # 대표이미지를 2개 이상 저정하지 못하도록 막는코드를 작성
     def clean(self):
         images = self.restaurant.restaurantimage_set.filter(is_representative=True)
-        # .restaurantimage_set: 해당 Restaurant 연결된 모든 이미지들
-        # .filter(): 괄호안이 조건이고 그에 맞는 필터링한 이미지를 가져온다.
+        # 이 이미지(RestaurantImage)가 연결된 Restaurant 객체
+        # .restaurantimage_set 해당 Restaurant에 연결된 모든 이미지들 (역참조)
+        # .filter(is_representative=True) 그중에서 is_representative=True인 이미지들만 필터링
 
-        if self.is_representative and images.exclude(id=self.id).count() > 0:
-            raise ValidationError("대표 이미지는 하나만 설정할 수 있습니다.")
-        # 현재 이미지가 대표이미지고 현재이미지를 제외한 다른 이미지들이 1개 이상 존재한다면
+        if (
+            self.is_representative and images.exclude(id=self.id).count() > 0
+        ):  # 대표 이미지를 2개 이상 지정하지 못하도록 막는 코드
+            raise ValidationError("대표 이미지는 1개만 지정 가능합니다.")
+            # self는 현재 저장하려는 RestaurantImage 인스턴스입니다.
+            # self.restaurant: 이 이미지가 속한 레스토랑
+            # restaurantimage_set: 그 레스토랑에 속한 모든 이미지들 (RestaurantImage 객체들)
+            # .filter(is_representative=True): 그중에서 대표 이미지(True) 로 설정된 것들만 가져옴
+            # "이 레스토랑에 이미 대표 이미지로 설정된 다른 이미지가 있는지 확인"하는 코드입니다.
 
 
 class RestaurantMenu(models.Model):
@@ -156,14 +174,17 @@ class RestaurantMenu(models.Model):
     price = models.PositiveIntegerField("가격", default=0)
     image = models.ImageField(
         "이미지", upload_to="restaurant-menu", null=True, blank=True
-    )  # MEDIA_ROOT/restaurant-menu/이미지파일을 저장
+    )
+    # 사용자가 이미지를 업로드하면 MEDIA_ROOT/restaurant-menu/ 폴더 아래에 이미지 파일이 저장됩니다. MEDIA_ROOT가 /media/라고 가정하면
 
-    created_at = models.DateTimeField("생성일", auto_now_add=True, db_index=True)
-    updated_at = models.DateTimeField("수정일", auto_now_add=True, db_index=True)
+    created_at = models.DateTimeField(
+        "생성일", auto_now_add=True, db_index=True
+    )  # 시간정렬을 할수도 있으니 적용하는것이 좋음
+    updated_at = models.DateTimeField("수정일", auto_now=True, db_index=True)
 
     class Meta:
-        verbose_name = "레스토랑 메뉴"
-        verbose_name_plural = "레스토랑 메뉴s"
+        verbose_name = "가게 메뉴"
+        verbose_name_plural = "가게 메뉴"
 
     def __str__(self):
         return self.name
@@ -173,26 +194,40 @@ class Review(models.Model):
     title = models.CharField("제목", max_length=100)
     author = models.CharField("작성자", max_length=100)
     profile_image = models.ImageField(
-        "프로필 이미지", upload_to="review-profile", null=True, blank=True
+        "프로필 이미지", upload_to="review-profile", blank=True, null=True
     )
     content = models.TextField("내용")
-    rating = models.PositiveSmallIntegerField(
+    rating = models.PositiveSmallIntegerField(  # 평점
         validators=[MinValueValidator(1), MaxValueValidator(5)]
     )
-    # 양의 정수 허용되는 필드 값의 범위를 0 ~ 30,000가능하다 실제사용 1~5
+    # 양의 정수만 허용되는 필드로 값의 범위는 0부터 32,767까지 가능하지만 아래 validators로 실제 허용 범위는 1~5로 제한됩니다.
+
     restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE)
     social_channel = models.ForeignKey(
         "SocialChannel", on_delete=models.SET_NULL, blank=True, null=True
     )
     created_at = models.DateTimeField("생성일", auto_now_add=True, db_index=True)
-    updated_at = models.DateTimeField("생성일", auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField("수정일", auto_now=True, db_index=True)
 
     class Meta:
         verbose_name = "리뷰"
-        verbose_name_plural = "리뷰s"
+        verbose_name_plural = "리뷰"
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.author}:{self.title}"
+
+    # ----------사용안함-----------------
+    @property
+    def restaurant_name(self):
+        return self.restaurant.name
+
+    @property
+    def content_partial(self):
+        return self.content[:20]
+
+
+# ----------사용안함-----------------
 
 
 class ReviewImage(models.Model):
