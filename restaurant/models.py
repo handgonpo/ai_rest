@@ -71,7 +71,7 @@ class Restaurant(models.Model):
         blank=True,
     )  # M:N 관계
     region = models.ForeignKey(
-        "지역",
+        "restaurant.Region",
         on_delete=models.SET_NULL,  # 참조된 지역 삭제시 null로 설정되며
         null=True,
         blank=True,
